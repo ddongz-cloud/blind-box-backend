@@ -6,6 +6,7 @@ import * as crossDomain from '@midwayjs/cross-domain';
 import * as staticFile from '@midwayjs/static-file';
 import * as swagger from '@midwayjs/swagger';
 import * as typeorm from '@midwayjs/typeorm';
+import * as jwt from '@midwayjs/jwt';
 import { join } from 'path';
 
 @Configuration({
@@ -17,6 +18,7 @@ import { join } from 'path';
     staticFile,
     swagger,
     typeorm,
+    jwt,
   ],
   importConfigs: [join(__dirname, './config')],
 })

@@ -1,9 +1,9 @@
-import { Framework } from '@midwayjs/koa';
-import { createApp, close } from '@midwayjs/mock';
+import { close, createBootstrap } from '@midwayjs/mock';
+import { join } from 'path';
 
 async function bootstrap() {
   try {
-    const app = await createApp<Framework>();
+    const app = await createBootstrap(join(__dirname, './'));
     console.log('✅ 应用启动成功');
 
     // 监听进程退出
