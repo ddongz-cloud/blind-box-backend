@@ -3,6 +3,7 @@ import * as koa from '@midwayjs/koa';
 import * as validate from '@midwayjs/validate';
 import * as crossDomain from '@midwayjs/cross-domain';
 import * as typeorm from '@midwayjs/typeorm';
+import * as jwt from '@midwayjs/jwt';
 import { join } from 'path';
 
 @Configuration({
@@ -11,6 +12,7 @@ import { join } from 'path';
     validate,
     crossDomain,
     typeorm,
+    jwt,
   ],
   importConfigs: [join(__dirname, './config')],
 })
