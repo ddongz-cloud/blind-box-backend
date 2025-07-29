@@ -1,19 +1,18 @@
-import { Framework } from '@midwayjs/koa';
-import { createApp, close } from '@midwayjs/mock';
+import { Bootstrap } from '@midwayjs/bootstrap';
 
 async function bootstrap() {
   try {
-    const app = await createApp<Framework>();
+    const app = await Bootstrap.run();
     console.log('✅ 应用启动成功');
 
     // 监听进程退出
     process.on('SIGTERM', async () => {
-      await close(app);
+      await app.stop();
       process.exit(0);
     });
 
     process.on('SIGINT', async () => {
-      await close(app);
+      await app.stop();
       process.exit(0);
     });
 

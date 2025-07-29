@@ -1,10 +1,7 @@
 import { Configuration, App } from '@midwayjs/core';
 import * as koa from '@midwayjs/koa';
 import * as validate from '@midwayjs/validate';
-import * as info from '@midwayjs/info';
 import * as crossDomain from '@midwayjs/cross-domain';
-import * as staticFile from '@midwayjs/static-file';
-import * as swagger from '@midwayjs/swagger';
 import * as typeorm from '@midwayjs/typeorm';
 import { join } from 'path';
 
@@ -12,10 +9,7 @@ import { join } from 'path';
   imports: [
     koa,
     validate,
-    info,
     crossDomain,
-    staticFile,
-    swagger,
     typeorm,
   ],
   importConfigs: [join(__dirname, './config')],

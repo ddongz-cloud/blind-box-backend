@@ -1,6 +1,12 @@
 import { MidwayConfig } from '@midwayjs/core';
 import { join } from 'path';
 import * as dotenv from 'dotenv';
+import { User } from '../entity/user.entity';
+import { BlindBoxSeries } from '../entity/blind-box-series.entity';
+import { BlindBoxItem } from '../entity/blind-box-item.entity';
+import { UserInventory } from '../entity/user-inventory.entity';
+import { Order } from '../entity/order.entity';
+import { PlayerShow } from '../entity/player-show.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -27,8 +33,8 @@ export default {
         type: 'sqlite',
         database: join(__dirname, '../../webapp.sqlite'),
         synchronize: true, // 开发环境自动同步表结构
-        logging: false,
-        entities: [join(__dirname, '../entity/*.entity{.ts,.js}')],
+        logging: true,
+        entities: [User, BlindBoxSeries, BlindBoxItem, UserInventory, Order, PlayerShow],
         migrations: [join(__dirname, '../migration/*.ts')],
         subscribers: [join(__dirname, '../subscriber/*.ts')],
       },
@@ -83,8 +89,8 @@ export default {
   // 日志配置
   midwayLogger: {
     default: {
-      level: 'info',
-      consoleLevel: 'info',
+      level: 'debug',
+      consoleLevel: 'debug',
     },
   },
 

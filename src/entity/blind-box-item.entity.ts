@@ -29,8 +29,8 @@ export class BlindBoxItem {
   image!: string;
 
   @Column({
-    type: 'enum',
-    enum: RarityLevel,
+    type: 'varchar',
+    length: 20,
     default: RarityLevel.COMMON
   })
   rarity!: RarityLevel;

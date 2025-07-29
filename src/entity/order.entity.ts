@@ -46,15 +46,15 @@ export class Order {
   totalAmount!: number;
 
   @Column({
-    type: 'enum',
-    enum: OrderStatus,
+    type: 'varchar',
+    length: 20,
     default: OrderStatus.PENDING
   })
   status!: OrderStatus;
 
   @Column({
-    type: 'enum',
-    enum: PaymentMethod,
+    type: 'varchar',
+    length: 20,
     nullable: true
   })
   paymentMethod!: PaymentMethod;
