@@ -26,6 +26,9 @@ export default {
     credentials: true,
   },
 
+  // 中间件配置
+  middleware: [],
+
   // TypeORM 数据库配置
   typeorm: {
     dataSource: {

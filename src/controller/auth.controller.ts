@@ -1,12 +1,18 @@
 import { Controller, Post, Body, Inject, Get, MidwayHttpError } from '@midwayjs/core';
-import { Validate } from '@midwayjs/validate';
-import { UserService, LoginUserDto } from '../service/user.service';
-import { RegisterDto } from '../dto/auth.dto';
+import { Context } from '@midwayjs/koa';
+import { JwtService } from '@midwayjs/jwt';
+import { UserService } from '../service/user.service';
 
 @Controller('/api/auth')
 export class AuthController {
   @Inject()
   userService!: UserService;
+
+  @Inject()
+  jwtService!: JwtService;
+
+  @Inject()
+  ctx!: Context;
 
   @Get('/health')
   async health() {
@@ -52,6 +58,42 @@ export class AuthController {
       console.error('登录错误:', error);
       // 抛出HTTP 401错误
       throw new MidwayHttpError((error as any).message || '登录失败', 401);
+    }
+  }
+
+  @Post('/logout')
+  async logout() {
+    try {
+      // 获取Authorization头
+      const authorization = this.ctx.headers.authorization;
+      if (!authorization) {
+        throw new MidwayHttpError('缺少认证令牌', 401);
+      }
+
+      // 检查Bearer格式
+      const parts = authorization.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        throw new MidwayHttpError('认证令牌格式错误', 401);
+      }
+
+      const token = parts[1];
+
+      // 验证JWT token
+      const payload = await this.jwtService.verify(token);
+      console.log('用户登出:', payload);
+
+      // JWT登出主要由客户端删除token实现
+      // 服务端只需要返回成功响应
+      return {
+        success: true,
+        message: '登出成功'
+      };
+    } catch (error) {
+      console.error('登出错误:', error);
+      if ((error as any).message?.includes('令牌')) {
+        throw error; // 重新抛出认证相关错误
+      }
+      throw new MidwayHttpError('认证令牌无效或已过期', 401);
     }
   }
 }
