@@ -43,8 +43,8 @@ export default {
 
   // JWT 配置
   jwt: {
-    secret: process.env.JWT_SECRET || 'blind-box-jwt-secret-key',
-    expiresIn: '7d',
+    secret: process.env.JWT_SECRET || 'blind-box-jwt-secret-key-2024-very-secure-random-string',
+    expiresIn: '2h',
   },
 
   // 密码加密配置
