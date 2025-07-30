@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@midwayjs/jwt';
 import { User } from '../entity/user.entity';
+import { UpdateProfileDto } from '../dto/user.dto';
 
 export interface RegisterUserDto {
   username: string;
@@ -24,6 +25,33 @@ export interface LoginResponse {
 
 export interface RefreshTokenResponse {
   token: string;
+}
+
+export interface ProfileResponse {
+  id: string;
+  username: string;
+  email: string;
+  nickname?: string;
+  avatar?: string;
+  points: number;
+  level: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  lastLoginAt?: Date;
+}
+
+export interface PointsHistoryResponse {
+  success: boolean;
+  data: {
+    points: number;
+    records: any[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+    };
+  };
 }
 
 export interface UserResponse {
@@ -147,6 +175,112 @@ export class UserService {
 
     return {
       token
+    };
+  }
+
+  async getProfile(userId: string): Promise<ProfileResponse> {
+    // 根据userId查找用户
+    const user = await this.userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new MidwayHttpError('用户不存在', 404);
+    }
+
+    // 返回清理过的用户信息，不包含密码等敏感字段
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      nickname: user.nickname,
+      avatar: user.avatar,
+      points: user.points,
+      level: user.level,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      lastLoginAt: user.lastLoginAt
+    };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<ProfileResponse> {
+    // 根据userId查找用户
+    const user = await this.userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new MidwayHttpError('用户不存在', 404);
+    }
+
+    // 更新用户信息
+    if (dto.nickname !== undefined) {
+      user.nickname = dto.nickname;
+    }
+    if (dto.avatar !== undefined) {
+      user.avatar = dto.avatar;
+    }
+
+    // 保存更新到数据库
+    const updatedUser = await this.userRepository.save(user);
+
+    // 返回清理过的用户信息
+    return {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      nickname: updatedUser.nickname,
+      avatar: updatedUser.avatar,
+      points: updatedUser.points,
+      level: updatedUser.level,
+      isActive: updatedUser.isActive,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+      lastLoginAt: updatedUser.lastLoginAt
+    };
+  }
+
+  async getPointsHistory(userId: string, page: number = 1, limit: number = 10): Promise<PointsHistoryResponse> {
+    // 这是一个模拟接口，返回静态数据
+    // 在实际项目中，这里会查询积分记录表
+
+    // 首先验证用户是否存在
+    const user = await this.userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new MidwayHttpError('用户不存在', 404);
+    }
+
+    // 返回模拟的积分记录数据
+    return {
+      success: true,
+      data: {
+        points: user.points,
+        records: [
+          {
+            id: '1',
+            type: 'earn',
+            amount: 100,
+            description: '每日签到奖励',
+            createdAt: '2025-07-29T10:00:00.000Z'
+          },
+          {
+            id: '2',
+            type: 'spend',
+            amount: -50,
+            description: '购买盲盒',
+            createdAt: '2025-07-28T15:30:00.000Z'
+          }
+        ],
+        pagination: {
+          page: page,
+          limit: limit,
+          total: 2
+        }
+      }
     };
   }
 }
