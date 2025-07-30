@@ -1,9 +1,11 @@
-import { Provide, Inject } from '@midwayjs/core';
+import { Provide } from '@midwayjs/core';
 import { MidwayHttpError } from '@midwayjs/core';
-import { InjectEntityModel } from '@midwayjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectEntityModel, InjectDataSource } from '@midwayjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Order, OrderStatus, PaymentMethod } from '../entity/order.entity';
 import { BlindBoxSeries } from '../entity/blind-box-series.entity';
+import { BlindBoxItem } from '../entity/blind-box-item.entity';
+import { UserInventory } from '../entity/user-inventory.entity';
 import { User } from '../entity/user.entity';
 import { CreateOrderDto } from '../dto/order.dto';
 
@@ -14,6 +16,15 @@ export interface CreateOrderResponse {
   status: string;
 }
 
+export interface DrawResult {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  rarity: string;
+  dropRate: number;
+}
+
 @Provide()
 export class OrderService {
   @InjectEntityModel(Order)
@@ -22,8 +33,17 @@ export class OrderService {
   @InjectEntityModel(BlindBoxSeries)
   seriesRepository!: Repository<BlindBoxSeries>;
 
+  @InjectEntityModel(BlindBoxItem)
+  itemRepository!: Repository<BlindBoxItem>;
+
+  @InjectEntityModel(UserInventory)
+  inventoryRepository!: Repository<UserInventory>;
+
   @InjectEntityModel(User)
   userRepository!: Repository<User>;
+
+  @InjectDataSource()
+  dataSource!: DataSource;
 
   async createOrder(userId: string, dto: CreateOrderDto): Promise<CreateOrderResponse> {
     console.log('OrderService.createOrder called with:', { userId, dto });
@@ -90,6 +110,145 @@ export class OrderService {
       totalAmount: savedOrder.totalAmount,
       status: savedOrder.status
     };
+  }
+
+  async executeDraw(userId: string, orderId: string): Promise<DrawResult[]> {
+    console.log('OrderService.executeDraw called with:', { userId, orderId });
+
+    // 1. 查找订单并预加载关联数据
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: ['series', 'series.items']
+    });
+
+    // 2. 前置校验
+    if (!order) {
+      throw new MidwayHttpError('订单不存在', 404);
+    }
+
+    if (order.userId !== userId) {
+      throw new MidwayHttpError('无权访问此订单', 403);
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new MidwayHttpError('订单已完成，无法重复抽取', 400);
+    }
+
+    if (!order.series || !order.series.items || order.series.items.length === 0) {
+      throw new MidwayHttpError('该系列暂无可抽取物品', 400);
+    }
+
+    console.log('Order validation passed, series:', order.series.name, 'items count:', order.series.items.length);
+
+    // 3. 过滤活跃物品
+    const activeItems = order.series.items.filter(item => item.isActive);
+    if (activeItems.length === 0) {
+      throw new MidwayHttpError('该系列暂无可抽取物品', 400);
+    }
+
+    // 4. 执行抽取
+    const drawnItems: BlindBoxItem[] = [];
+    for (let i = 0; i < order.quantity; i++) {
+      const drawnItem = this._weightedRandomDraw(activeItems);
+      drawnItems.push(drawnItem);
+    }
+
+    console.log('Draw completed, items:', drawnItems.map(item => item.name));
+
+    // 5. 使用事务更新库存和订单状态
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 更新用户库存
+      for (const item of drawnItems) {
+        const existingInventory = await queryRunner.manager.findOne(UserInventory, {
+          where: { userId, itemId: item.id }
+        });
+
+        if (existingInventory) {
+          // 已拥有该物品，增加数量
+          await queryRunner.manager.update(UserInventory,
+            { userId, itemId: item.id },
+            { quantity: existingInventory.quantity + 1, obtainMethod: 'blind_box_draw' }
+          );
+        } else {
+          // 新获得物品，创建记录
+          const newInventory = queryRunner.manager.create(UserInventory, {
+            userId,
+            itemId: item.id,
+            quantity: 1,
+            obtainMethod: 'blind_box_draw'
+          });
+          await queryRunner.manager.save(newInventory);
+        }
+
+        // 更新物品获得次数
+        await queryRunner.manager.update(BlindBoxItem,
+          { id: item.id },
+          { obtainedCount: () => 'obtainedCount + 1' }
+        );
+      }
+
+      // 更新订单状态
+      await queryRunner.manager.update(Order,
+        { id: orderId },
+        {
+          status: OrderStatus.COMPLETED,
+          completedAt: new Date(),
+          resultItems: JSON.stringify(drawnItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            rarity: item.rarity
+          })))
+        }
+      );
+
+      await queryRunner.commitTransaction();
+      console.log('Transaction committed successfully');
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error('Transaction failed, rolling back:', error);
+      throw new MidwayHttpError('抽取失败，请重试', 500);
+    } finally {
+      await queryRunner.release();
+    }
+
+    // 6. 返回抽取结果
+    return drawnItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      image: item.image,
+      rarity: item.rarity,
+      dropRate: Number(item.dropRate)
+    }));
+  }
+
+  private _weightedRandomDraw(items: BlindBoxItem[]): BlindBoxItem {
+    // 计算总概率
+    const totalProbability = items.reduce((sum, item) => sum + Number(item.dropRate), 0);
+
+    if (totalProbability <= 0) {
+      throw new MidwayHttpError('物品概率配置错误', 500);
+    }
+
+    // 生成随机数
+    const random = Math.random() * totalProbability;
+
+    // 累加概率查找
+    let cumulativeProbability = 0;
+    for (const item of items) {
+      cumulativeProbability += Number(item.dropRate);
+      if (random <= cumulativeProbability) {
+        return item;
+      }
+    }
+
+    // 兜底返回最后一个物品
+    return items[items.length - 1];
   }
 
   private generateOrderNumber(): string {
