@@ -22,6 +22,10 @@ export interface LoginResponse {
   user: UserResponse;
 }
 
+export interface RefreshTokenResponse {
+  token: string;
+}
+
 export interface UserResponse {
   id: string;
   username: string;
@@ -130,6 +134,19 @@ export class UserService {
         level: user.level,
         createdAt: user.createdAt
       }
+    };
+  }
+
+  async refreshToken(userPayload: { id: string; username: string }): Promise<RefreshTokenResponse> {
+    // 生成新的JWT token
+    const payload = {
+      id: userPayload.id,
+      username: userPayload.username
+    };
+    const token = await this.jwtService.sign(payload);
+
+    return {
+      token
     };
   }
 }

@@ -96,4 +96,42 @@ export class AuthController {
       throw new MidwayHttpError('认证令牌无效或已过期', 401);
     }
   }
+
+  @Post('/refresh')
+  async refresh() {
+    try {
+      // 获取Authorization头
+      const authorization = this.ctx.headers.authorization;
+      if (!authorization) {
+        throw new MidwayHttpError('缺少认证令牌', 401);
+      }
+
+      // 检查Bearer格式
+      const parts = authorization.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        throw new MidwayHttpError('认证令牌格式错误', 401);
+      }
+
+      const token = parts[1];
+
+      // 验证JWT token并获取用户信息
+      const payload = await this.jwtService.verify(token) as unknown as { id: string; username: string };
+      console.log('刷新Token请求，用户:', payload);
+
+      // 调用UserService生成新token
+      const result = await this.userService.refreshToken(payload);
+
+      return {
+        success: true,
+        data: result,
+        message: 'Token刷新成功'
+      };
+    } catch (error) {
+      console.error('Token刷新错误:', error);
+      if ((error as any).message?.includes('令牌')) {
+        throw error; // 重新抛出认证相关错误
+      }
+      throw new MidwayHttpError('认证令牌无效或已过期', 401);
+    }
+  }
 }
