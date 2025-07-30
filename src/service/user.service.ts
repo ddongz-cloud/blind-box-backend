@@ -283,4 +283,21 @@ export class UserService {
       }
     };
   }
+
+  async addPoints(userId: string, amount: number): Promise<{ points: number }> {
+    // 根据userId查找用户
+    const user = await this.userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new MidwayHttpError('用户不存在', 404);
+    }
+
+    // 增加积分
+    const newPoints = user.points + amount;
+    await this.userRepository.update(userId, { points: newPoints });
+
+    return { points: newPoints };
+  }
 }
