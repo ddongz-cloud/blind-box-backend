@@ -25,6 +25,39 @@ export interface DrawResult {
   dropRate: number;
 }
 
+export interface OrderListResponse {
+  orders: Order[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface OrderDetailResponse {
+  id: string;
+  orderNumber: string;
+  userId: string;
+  seriesId: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  status: string;
+  paymentMethod: string;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+  series: any;
+  resultItems: any[];
+}
+
+export interface OrderQueryParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
 @Provide()
 export class OrderService {
   @InjectEntityModel(Order)
@@ -249,6 +282,153 @@ export class OrderService {
 
     // 兜底返回最后一个物品
     return items[items.length - 1];
+  }
+
+  async getOrderList(userId: string, query: OrderQueryParams): Promise<OrderListResponse> {
+    console.log('OrderService.getOrderList called with:', { userId, query });
+
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // 构建查询条件
+    const whereCondition: any = { userId };
+
+    // 如果指定了状态，添加到查询条件中
+    if (query.status) {
+      whereCondition.status = query.status;
+    }
+
+    // 执行分页查询，预加载系列信息
+    const [orders, total] = await this.orderRepository.findAndCount({
+      where: whereCondition,
+      relations: ['series'],
+      skip,
+      take: limit,
+      order: {
+        createdAt: 'DESC' // 按创建时间倒序排列
+      }
+    });
+
+    console.log(`Found ${orders.length} orders for user ${userId}`);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    };
+  }
+
+  async getOrderDetail(userId: string, orderId: string): Promise<OrderDetailResponse> {
+    console.log('OrderService.getOrderDetail called with:', { userId, orderId });
+
+    // 查找订单并预加载系列信息
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: ['series']
+    });
+
+    // 安全检查
+    if (!order) {
+      throw new MidwayHttpError('订单不存在', 404);
+    }
+
+    // 权限检查
+    if (order.userId !== userId) {
+      throw new MidwayHttpError('无权查看他人订单', 403);
+    }
+
+    console.log('Order found:', order.orderNumber, 'Status:', order.status);
+
+    // 查找与该订单相关的抽取结果
+    let resultItems: any[] = [];
+
+    // 如果订单已完成，查找用户库存中与此订单相关的物品
+    if (order.status === OrderStatus.COMPLETED && order.resultItems) {
+      try {
+        // 解析存储在订单中的抽取结果
+        const storedResults = JSON.parse(order.resultItems);
+
+        // 根据物品ID查找详细信息
+        if (storedResults && Array.isArray(storedResults)) {
+          const itemIds = storedResults.map((item: any) => item.id);
+          if (itemIds.length > 0) {
+            const items = await this.itemRepository.find({
+              where: itemIds.map(id => ({ id }))
+            });
+
+            // 组装结果，包含数量信息
+            resultItems = storedResults.map((storedItem: any) => {
+              const fullItem = items.find(item => item.id === storedItem.id);
+              return {
+                ...fullItem,
+                obtainedQuantity: storedResults.filter((r: any) => r.id === storedItem.id).length
+              };
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing result items:', error);
+        resultItems = [];
+      }
+    }
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      userId: order.userId,
+      seriesId: order.seriesId,
+      quantity: order.quantity,
+      unitPrice: Number(order.unitPrice),
+      totalAmount: Number(order.totalAmount),
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      completedAt: order.completedAt,
+      series: order.series,
+      resultItems
+    };
+  }
+
+  async cancelOrder(userId: string, orderId: string): Promise<{ message: string }> {
+    console.log('OrderService.cancelOrder called with:', { userId, orderId });
+
+    // 查找订单
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId }
+    });
+
+    // 安全检查
+    if (!order) {
+      throw new MidwayHttpError('订单不存在', 404);
+    }
+
+    // 权限检查
+    if (order.userId !== userId) {
+      throw new MidwayHttpError('无权操作他人订单', 403);
+    }
+
+    // 业务逻辑检查：只有待处理状态的订单才能取消
+    if (order.status !== OrderStatus.PENDING) {
+      throw new MidwayHttpError('订单状态不允许取消', 400);
+    }
+
+    // 更新订单状态为已取消
+    order.status = OrderStatus.CANCELLED;
+    await this.orderRepository.save(order);
+
+    console.log(`Order ${orderId} cancelled successfully`);
+
+    return {
+      message: '订单取消成功'
+    };
   }
 
   private generateOrderNumber(): string {
