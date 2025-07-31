@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { User } from './user.entity';
 import { BlindBoxItem } from './blind-box-item.entity';
+import { PlayerShowLike } from './player-show-like.entity';
 
 @Entity('player_shows')
 @Index(['userId'])
@@ -59,4 +60,7 @@ export class PlayerShow {
   @ManyToOne(() => BlindBoxItem, item => item.playerShows, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'itemId' })
   item!: BlindBoxItem;
+
+  @OneToMany(() => PlayerShowLike, like => like.playerShow)
+  likes!: PlayerShowLike[];
 }

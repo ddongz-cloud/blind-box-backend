@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { UserInventory } from './user-inventory.entity';
 import { Order } from './order.entity';
 import { PlayerShow } from './player-show.entity';
+import { PlayerShowLike } from './player-show-like.entity';
 
 @Entity('users')
 @Index(['username'], { unique: true })
@@ -52,4 +53,7 @@ export class User {
 
   @OneToMany(() => PlayerShow, playerShow => playerShow.user)
   playerShows!: PlayerShow[];
+
+  @OneToMany(() => PlayerShowLike, like => like.user)
+  playerShowLikes!: PlayerShowLike[];
 }
