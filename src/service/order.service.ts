@@ -1,4 +1,4 @@
-import { Provide } from '@midwayjs/core';
+import { Provide, Inject } from '@midwayjs/core';
 import { MidwayHttpError } from '@midwayjs/core';
 import { InjectEntityModel, InjectDataSource } from '@midwayjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -8,6 +8,7 @@ import { BlindBoxItem } from '../entity/blind-box-item.entity';
 import { UserInventory } from '../entity/user-inventory.entity';
 import { User } from '../entity/user.entity';
 import { CreateOrderDto } from '../dto/order.dto';
+import { PointsHistoryService } from './points-history.service';
 
 export interface CreateOrderResponse {
   orderId: string;
@@ -78,6 +79,9 @@ export class OrderService {
   @InjectDataSource()
   dataSource!: DataSource;
 
+  @Inject()
+  pointsHistoryService!: PointsHistoryService;
+
   async createOrder(userId: string, dto: CreateOrderDto): Promise<CreateOrderResponse> {
     console.log('OrderService.createOrder called with:', { userId, dto });
 
@@ -136,6 +140,20 @@ export class OrderService {
       points: user.points - totalAmount
     });
     console.log('User points updated, deducted:', totalAmount);
+
+    // 8. 记录积分消费记录
+    try {
+      await this.pointsHistoryService.recordPurchaseSpend(
+        userId,
+        totalAmount,
+        series.name,
+        savedOrder.id
+      );
+      console.log('Points history recorded for purchase');
+    } catch (error) {
+      console.error('Failed to record points history:', error);
+      // 不影响主流程，只记录错误
+    }
 
     return {
       orderId: savedOrder.id,

@@ -8,6 +8,7 @@ import { UserInventory } from '../entity/user-inventory.entity';
 import { Order } from '../entity/order.entity';
 import { PlayerShow } from '../entity/player-show.entity';
 import { PlayerShowLike } from '../entity/player-show-like.entity';
+import { PointsHistory } from '../entity/points-history.entity';
 
 // 加载环境变量
 dotenv.config();
@@ -38,7 +39,7 @@ export default {
         database: join(__dirname, '../../webapp.sqlite'),
         synchronize: true, // 开发环境自动同步表结构
         logging: true,
-        entities: [User, BlindBoxSeries, BlindBoxItem, UserInventory, Order, PlayerShow, PlayerShowLike],
+        entities: [User, BlindBoxSeries, BlindBoxItem, UserInventory, Order, PlayerShow, PlayerShowLike, PointsHistory],
         migrations: [join(__dirname, '../migration/*.ts')],
         subscribers: [join(__dirname, '../subscriber/*.ts')],
       },

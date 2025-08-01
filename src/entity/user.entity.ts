@@ -3,6 +3,7 @@ import { UserInventory } from './user-inventory.entity';
 import { Order } from './order.entity';
 import { PlayerShow } from './player-show.entity';
 import { PlayerShowLike } from './player-show-like.entity';
+import { PointsHistory } from './points-history.entity';
 
 @Entity('users')
 @Index(['username'], { unique: true })
@@ -56,4 +57,7 @@ export class User {
 
   @OneToMany(() => PlayerShowLike, like => like.user)
   playerShowLikes!: PlayerShowLike[];
+
+  @OneToMany(() => PointsHistory, pointsHistory => pointsHistory.user)
+  pointsHistory!: PointsHistory[];
 }

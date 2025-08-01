@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@midwayjs/jwt';
 import { User } from '../entity/user.entity';
 import { UpdateProfileDto } from '../dto/user.dto';
+import { PointsHistoryService } from './points-history.service';
 
 export interface RegisterUserDto {
   username: string;
@@ -72,6 +73,9 @@ export class UserService {
 
   @Inject()
   jwtService!: JwtService;
+
+  @Inject()
+  pointsHistoryService!: PointsHistoryService;
 
   async register(userData: RegisterUserDto): Promise<UserResponse> {
     const { username, email, password } = userData;
@@ -242,9 +246,6 @@ export class UserService {
   }
 
   async getPointsHistory(userId: string, page: number = 1, limit: number = 10): Promise<PointsHistoryResponse> {
-    // 这是一个模拟接口，返回静态数据
-    // 在实际项目中，这里会查询积分记录表
-
     // 首先验证用户是否存在
     const user = await this.userRepository.findOne({
       where: { id: userId }
@@ -254,31 +255,28 @@ export class UserService {
       throw new MidwayHttpError('用户不存在', 404);
     }
 
-    // 返回模拟的积分记录数据
+    // 获取真实的积分记录数据
+    const historyData = await this.pointsHistoryService.getUserPointsHistory(userId, page, limit);
+
+    // 格式化记录数据
+    const formattedRecords = historyData.records.map(record => ({
+      id: record.id,
+      type: record.type,
+      amount: record.amount,
+      description: record.description,
+      createdAt: record.createdAt.toISOString(),
+      balanceAfter: record.balanceAfter
+    }));
+
     return {
       success: true,
       data: {
         points: user.points,
-        records: [
-          {
-            id: '1',
-            type: 'earn',
-            amount: 100,
-            description: '每日签到奖励',
-            createdAt: '2025-07-29T10:00:00.000Z'
-          },
-          {
-            id: '2',
-            type: 'spend',
-            amount: -50,
-            description: '购买盲盒',
-            createdAt: '2025-07-28T15:30:00.000Z'
-          }
-        ],
+        records: formattedRecords,
         pagination: {
-          page: page,
-          limit: limit,
-          total: 2
+          page: historyData.page,
+          limit: historyData.limit,
+          total: historyData.total
         }
       }
     };
