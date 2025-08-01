@@ -3,6 +3,7 @@ import { MidwayHttpError } from '@midwayjs/core';
 import { InjectEntityModel } from '@midwayjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { BlindBoxSeries } from '../entity/blind-box-series.entity';
+import { BlindBoxItem } from '../entity/blind-box-item.entity';
 
 export interface SeriesListResponse {
   series: BlindBoxSeries[];
@@ -29,6 +30,9 @@ export interface SearchSeriesParams {
 export class BlindBoxService {
   @InjectEntityModel(BlindBoxSeries)
   seriesRepository!: Repository<BlindBoxSeries>;
+
+  @InjectEntityModel(BlindBoxItem)
+  itemRepository!: Repository<BlindBoxItem>;
 
   async getSeriesList(params: SeriesListParams): Promise<SeriesListResponse> {
     const { page = 1, limit = 12, category } = params;
@@ -108,5 +112,51 @@ export class BlindBoxService {
     });
 
     return series;
+  }
+
+  async createSeries(seriesData: any): Promise<BlindBoxSeries> {
+    // 检查系列名称是否已存在
+    const existingSeries = await this.seriesRepository.findOne({
+      where: { name: seriesData.name }
+    });
+
+    if (existingSeries) {
+      throw new MidwayHttpError('系列名称已存在', 400);
+    }
+
+    // 创建系列
+    const series = this.seriesRepository.create({
+      name: seriesData.name,
+      description: seriesData.description,
+      category: seriesData.category,
+      coverImage: seriesData.coverImage,
+      price: seriesData.price,
+      isActive: seriesData.isActive,
+      popularity: seriesData.popularity || 0,
+      totalStock: 0,
+      soldCount: 0
+    });
+
+    const savedSeries = await this.seriesRepository.save(series);
+
+    // 创建系列中的物品
+    if (seriesData.items && seriesData.items.length > 0) {
+      for (const itemData of seriesData.items) {
+        const item = this.itemRepository.create({
+          name: itemData.name,
+          description: itemData.description,
+          image: itemData.image,
+          rarity: itemData.rarity,
+          dropRate: itemData.probability,
+          seriesId: savedSeries.id,
+          totalCount: 0,
+          obtainedCount: 0,
+          isActive: true
+        });
+        await this.itemRepository.save(item);
+      }
+    }
+
+    return savedSeries;
   }
 }

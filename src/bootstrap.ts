@@ -1,8 +1,9 @@
 import { Bootstrap } from '@midwayjs/bootstrap';
+import { ContainerLifeCycle } from './configuration';
 
 async function bootstrap() {
   try {
-    const app = await Bootstrap.run();
+    const app = await Bootstrap.configure(ContainerLifeCycle).run();
     console.log('✅ 应用启动成功');
 
     // 监听进程退出

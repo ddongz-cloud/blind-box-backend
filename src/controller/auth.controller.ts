@@ -36,10 +36,8 @@ export class AuthController {
       };
     } catch (error) {
       console.error('注册错误:', error);
-      return {
-        success: false,
-        message: (error as any).message || '注册失败'
-      };
+      // 抛出HTTP 400错误，保持与登录接口一致
+      throw new MidwayHttpError((error as any).message || '注册失败', 400);
     }
   }
 

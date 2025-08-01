@@ -625,10 +625,8 @@ MIT License
 
 ## 联系方式
 
-- 项目维护者: [Your Name]
-- 邮箱: support@blindbox.com
 - 项目地址: https://github.com/ddongz-cloud/blind-box-backend
 
 ---
 
-**注意**: 这是一个演示项目，请在生产环境中加强安全配置和性能优化。
+**注意**: 此文档由AI辅助生成

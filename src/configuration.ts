@@ -15,6 +15,7 @@ import { join } from 'path';
     jwt,
   ],
   importConfigs: [join(__dirname, './config')],
+  conflictCheck: true,
 })
 export class ContainerLifeCycle {
   @App()
