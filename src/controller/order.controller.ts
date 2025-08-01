@@ -218,4 +218,47 @@ export class OrderController {
       throw new MidwayHttpError('认证令牌无效或已过期', 401);
     }
   }
+
+  @Put('/:orderId/pay')
+  async payOrder(@Param('orderId') orderId: string) {
+    try {
+      console.log('支付订单请求，订单ID:', orderId);
+
+      // JWT认证验证
+      const authorization = this.ctx.headers.authorization;
+      if (!authorization) {
+        throw new MidwayHttpError('缺少认证令牌', 401);
+      }
+
+      const parts = authorization.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        throw new MidwayHttpError('认证令牌格式错误', 401);
+      }
+
+      const token = parts[1];
+      const payload = await this.jwtService.verify(token) as unknown as { id: string; username: string };
+      console.log('支付订单请求，用户:', payload);
+
+      // 调用服务支付订单
+      const result = await this.orderService.payOrder(payload.id, orderId);
+
+      return {
+        success: true,
+        data: result,
+        message: result.message
+      };
+    } catch (error) {
+      console.error('支付订单错误:', error);
+      if ((error as any).message?.includes('令牌')) {
+        throw error;
+      }
+      if ((error as any).message?.includes('不存在') ||
+          (error as any).message?.includes('无权操作') ||
+          (error as any).message?.includes('不允许支付') ||
+          (error as any).message?.includes('积分不足')) {
+        throw error;
+      }
+      throw new MidwayHttpError('认证令牌无效或已过期', 401);
+    }
+  }
 }

@@ -135,25 +135,8 @@ export class OrderService {
     const savedOrder = await this.orderRepository.save(order);
     console.log('Order saved with ID:', savedOrder.id);
 
-    // 7. 扣除用户积分
-    await this.userRepository.update(userId, {
-      points: user.points - totalAmount
-    });
-    console.log('User points updated, deducted:', totalAmount);
-
-    // 8. 记录积分消费记录
-    try {
-      await this.pointsHistoryService.recordPurchaseSpend(
-        userId,
-        totalAmount,
-        series.name,
-        savedOrder.id
-      );
-      console.log('Points history recorded for purchase');
-    } catch (error) {
-      console.error('Failed to record points history:', error);
-      // 不影响主流程，只记录错误
-    }
+    // 7. 订单创建成功，不立即扣除积分（等待支付）
+    console.log('Order created successfully, waiting for payment');
 
     return {
       orderId: savedOrder.id,
@@ -181,8 +164,8 @@ export class OrderService {
       throw new MidwayHttpError('无权访问此订单', 403);
     }
 
-    if (order.status !== OrderStatus.PENDING) {
-      throw new MidwayHttpError('订单已完成，无法重复抽取', 400);
+    if (order.status !== OrderStatus.PAID) {
+      throw new MidwayHttpError('订单未支付或已完成，无法抽取', 400);
     }
 
     if (!order.series || !order.series.items || order.series.items.length === 0) {
@@ -447,6 +430,86 @@ export class OrderService {
     return {
       message: '订单取消成功'
     };
+  }
+
+  async payOrder(userId: string, orderId: string): Promise<{ message: string; orderId: string }> {
+    console.log('OrderService.payOrder called with:', { userId, orderId });
+
+    // 查找订单并预加载系列信息
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: ['series']
+    });
+
+    // 安全检查
+    if (!order) {
+      throw new MidwayHttpError('订单不存在', 404);
+    }
+
+    // 权限检查
+    if (order.userId !== userId) {
+      throw new MidwayHttpError('无权操作他人订单', 403);
+    }
+
+    // 业务逻辑检查：只有待处理状态的订单才能支付
+    if (order.status !== OrderStatus.PENDING) {
+      throw new MidwayHttpError('订单状态不允许支付', 400);
+    }
+
+    // 获取用户信息检查积分
+    const user = await this.userRepository.findOne({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new MidwayHttpError('用户不存在', 404);
+    }
+
+    // 检查用户积分是否足够
+    if (user.points < order.totalAmount) {
+      throw new MidwayHttpError(`积分不足，需要${order.totalAmount}积分，当前只有${user.points}积分`, 400);
+    }
+
+    // 使用事务处理支付
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 扣除用户积分
+      await queryRunner.manager.update('users', { id: userId }, {
+        points: user.points - order.totalAmount
+      });
+
+      // 更新订单状态为已支付
+      await queryRunner.manager.update('orders', { id: orderId }, {
+        status: OrderStatus.PAID,
+        paidAt: new Date()
+      });
+
+      // 记录积分消费记录
+      await this.pointsHistoryService.recordPurchaseSpend(
+        userId,
+        order.totalAmount,
+        order.series.name,
+        orderId
+      );
+
+      await queryRunner.commitTransaction();
+      console.log(`Order ${orderId} paid successfully`);
+
+      return {
+        message: '支付成功',
+        orderId: orderId
+      };
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      console.error('Payment failed:', error);
+      throw new MidwayHttpError('支付失败', 500);
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private generateOrderNumber(): string {
