@@ -41,10 +41,10 @@ export class InventoryService {
       whereCondition.item = { rarity: query.rarity };
     }
 
-    // 执行分页查询，预加载物品信息
+    // 执行分页查询，预加载物品信息和系列信息
     const [items, total] = await this.inventoryRepository.findAndCount({
       where: whereCondition,
-      relations: ['item'],
+      relations: ['item', 'item.series'],
       skip,
       take: limit,
       order: {
