@@ -1,12 +1,12 @@
 import { Controller, Get, Inject, MidwayHttpError, Query, Param } from '@midwayjs/core';
 import { BlindBoxService } from '../service/blindbox.service';
 
-@Controller('/api/blindbox')
+@Controller('/api/series')
 export class BlindBoxController {
   @Inject()
   blindBoxService!: BlindBoxService;
 
-  @Get('/series')
+  @Get('/')
   async getSeriesList(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 12,
@@ -32,7 +32,7 @@ export class BlindBoxController {
     }
   }
 
-  @Get('/series/:id')
+  @Get('/:id')
   async getSeriesDetail(@Param('id') id: string) {
     try {
       console.log('获取系列详情请求，ID:', id);
